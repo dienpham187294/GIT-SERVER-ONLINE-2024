@@ -6,19 +6,32 @@ const socketIo = require("socket.io");
 const router = require("./router/io");
 
 const app = express();
+
+// Configure CORS
+const corsOptions = {
+  origin: "*", // Allow all origins, you can restrict this to specific domains
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+  ],
+};
+
+app.use(cors(corsOptions));
+
+app.get("/message", (req, res) => {
+  res.send("Hello from the backend!");
+});
+
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
+    origin: "*", // Allow all origins, you can restrict this to specific domains
     methods: ["GET", "POST"],
-    credentials: true,
   },
-});
-
-app.use(cors({}));
-
-app.get("/message", (req, res) => {
-  // Your logic to handle the request and send the message
-  res.send("Hello from the backend!");
 });
 
 router(io); // Pass the io instance to the router
