@@ -70,6 +70,7 @@ module.exports = (io) => {
           isReady: false,
           incrementReady: false,
           score: 0, // Initialize score
+          isPause: false,
         });
 
         console.log(JSON.stringify(rooms[roomCode].users));
@@ -96,6 +97,7 @@ module.exports = (io) => {
               isReady: false,
               incrementReady: false,
               score: 0, // Initialize score
+              isPause: false,
             });
             emitUpdateRoom(roomCode);
           } else {
@@ -132,11 +134,14 @@ module.exports = (io) => {
         const userIndex = rooms[roomCode]?.users.findIndex(
           (user) => user.id === socket.id
         );
+
         if (userIndex !== -1) {
           rooms[roomCode].users[userIndex].incrementReady = incrementReady;
+
           const incrementAllReady = rooms[roomCode].users.every(
-            (user) => user.incrementReady
+            (user) => user.incrementReady && !user.isPause
           );
+
           rooms[roomCode].incrementAllReady = incrementAllReady;
           emitUpdateRoom(roomCode);
         }
