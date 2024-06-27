@@ -3,7 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const socketIo = require("socket.io");
-const router = require("./router/io");
+const routerIO = require("./router/io");
+const message = require("./router/message");
 
 const app = express();
 
@@ -34,8 +35,8 @@ const io = socketIo(server, {
   },
 });
 
-router(io); // Pass the io instance to the router
-
+routerIO(io); // Pass the io instance to the router
+message(io); // Pass the io instance to the router
 server.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });

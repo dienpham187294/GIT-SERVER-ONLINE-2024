@@ -3,16 +3,29 @@ module.exports = (io) => {
   let connectedUsers = 0;
 
   io.on("connection", (socket) => {
-    console.log("New client connected:", socket.id);
+    console.log("New client connected LOCAL:", socket.id);
 
-    socket.on("message", (message) => {
-      try {
-        console.log("Message received: ", message);
-        io.emit("message", message);
-      } catch (error) {
-        console.error("Error handling message event:", error);
+    const emitUpdateRoom = (roomCode) => {
+      if (rooms[roomCode]) {
+        io.to(roomCode).emit(
+          "updateRoom",
+          rooms[roomCode].users,
+          rooms[roomCode].allReady,
+          rooms[roomCode].roomInfo,
+          rooms[roomCode].numberBegin,
+          rooms[roomCode].incrementAllReady
+        );
       }
-    });
+    };
+
+    const getRoomList = () => {
+      return Object.keys(rooms).map((roomCode) => ({
+        roomCode,
+        allReady: rooms[roomCode].allReady,
+        roomInfo: rooms[roomCode].roomInfo,
+        numberOfUsers: rooms[roomCode].users.length,
+      }));
+    };
 
     connectedUsers++;
     io.emit("onlineNumber", connectedUsers);
@@ -31,14 +44,7 @@ module.exports = (io) => {
           if (rooms[roomCode].users.length === 0) {
             delete rooms[roomCode];
           } else {
-            io.to(roomCode).emit(
-              "updateRoom",
-              rooms[roomCode].users,
-              rooms[roomCode].allReady,
-              rooms[roomCode].roomInfo,
-              rooms[roomCode].numberBegin,
-              rooms[roomCode].incrementAllReady
-            );
+            emitUpdateRoom(roomCode);
           }
         }
         io.emit("roomListUpdate", getRoomList());
@@ -65,6 +71,8 @@ module.exports = (io) => {
           incrementReady: false,
           score: 0, // Initialize score
         });
+
+        console.log(JSON.stringify(rooms[roomCode].users));
         callback(roomCode);
         io.emit("roomListUpdate", getRoomList());
       } catch (error) {
@@ -74,7 +82,8 @@ module.exports = (io) => {
 
     socket.on("joinRoom", (roomCode) => {
       try {
-        if (rooms[roomCode] && !rooms[roomCode].allReady) {
+        // && !rooms[roomCode].allReady
+        if (rooms[roomCode]) {
           const existingUser = rooms[roomCode].users.find(
             (user) => user.id === socket.id
           );
@@ -88,31 +97,17 @@ module.exports = (io) => {
               incrementReady: false,
               score: 0, // Initialize score
             });
-            io.to(roomCode).emit(
-              "updateRoom",
-              rooms[roomCode].users,
-              rooms[roomCode].allReady,
-              rooms[roomCode].roomInfo,
-              rooms[roomCode].numberBegin,
-              rooms[roomCode].incrementAllReady
-            );
+            emitUpdateRoom(roomCode);
           } else {
             socket.emit("alreadyInRoom", roomCode);
-            io.to(roomCode).emit(
-              "updateRoom",
-              rooms[roomCode].users,
-              rooms[roomCode].allReady,
-              rooms[roomCode].roomInfo,
-              rooms[roomCode].numberBegin,
-              rooms[roomCode].incrementAllReady
-            );
+            emitUpdateRoom(roomCode);
           }
         } else {
           io.to(socket.id).emit("roomDoesNotExist", roomCode);
         }
         io.emit("roomListUpdate", getRoomList());
       } catch (error) {
-        console.error("Error handling joinRoom event:", error);
+        console.log("Error handling joinRoom event:", error);
       }
     });
 
@@ -125,17 +120,10 @@ module.exports = (io) => {
           rooms[roomCode].users[userIndex].isReady = isReady;
           const allReady = rooms[roomCode].users.every((user) => user.isReady);
           rooms[roomCode].allReady = allReady;
-          io.to(roomCode).emit(
-            "updateRoom",
-            rooms[roomCode].users,
-            allReady,
-            rooms[roomCode].roomInfo,
-            rooms[roomCode].numberBegin,
-            rooms[roomCode].incrementAllReady
-          );
+          emitUpdateRoom(roomCode);
         }
       } catch (error) {
-        console.error("Error handling userReadyChange event:", error);
+        console.log("Error handling userReadyChange event:", error);
       }
     });
 
@@ -150,17 +138,10 @@ module.exports = (io) => {
             (user) => user.incrementReady
           );
           rooms[roomCode].incrementAllReady = incrementAllReady;
-          io.to(roomCode).emit(
-            "updateRoom",
-            rooms[roomCode].users,
-            rooms[roomCode].allReady,
-            rooms[roomCode].roomInfo,
-            rooms[roomCode].numberBegin,
-            incrementAllReady
-          );
+          emitUpdateRoom(roomCode);
         }
       } catch (error) {
-        console.error("Error handling incrementReadyChange event:", error);
+        console.log("Error handling incrementReadyChange event:", error);
       }
     });
 
@@ -171,14 +152,7 @@ module.exports = (io) => {
         );
         if (userIndex !== -1) {
           rooms[roomCode].users[userIndex].name = newUserName;
-          io.to(roomCode).emit(
-            "updateRoom",
-            rooms[roomCode].users,
-            rooms[roomCode].allReady,
-            rooms[roomCode].roomInfo,
-            rooms[roomCode].numberBegin,
-            rooms[roomCode].incrementAllReady
-          );
+          emitUpdateRoom(roomCode);
         }
       } catch (error) {
         console.error("Error handling updateUserName event:", error);
@@ -193,17 +167,40 @@ module.exports = (io) => {
             (user) => (user.incrementReady = false)
           );
           rooms[roomCode].incrementAllReady = false;
-          io.to(roomCode).emit(
-            "updateRoom",
-            rooms[roomCode].users,
-            rooms[roomCode].allReady,
-            rooms[roomCode].roomInfo,
-            rooms[roomCode].numberBegin,
-            rooms[roomCode].incrementAllReady
-          );
+          emitUpdateRoom(roomCode);
         }
       } catch (error) {
         console.error("Error handling incrementNumberBegin event:", error);
+      }
+    });
+
+    // socket.on("updateScore", (roomCode, userId, newScore) => {
+    //   try {
+    //     console.log("GETNEWSCORE", newScore);
+    //     const userIndex = rooms[roomCode]?.users.findIndex(
+    //       (user) => user.id === userId
+    //     );
+    //     if (userIndex !== -1) {
+    //       rooms[roomCode].users[userIndex].score = newScore;
+    //       emitUpdateRoom(roomCode);
+    //     }
+    //   } catch (error) {
+    //     console.error("Error handling updateScore event:", error);
+    //   }
+    // });
+
+    socket.on("updateOneELEMENT", (roomCode, userId, ELEMENT, newVALUE) => {
+      try {
+        console.log("GETNEWVALUE", newVALUE);
+        const userIndex = rooms[roomCode]?.users.findIndex(
+          (user) => user.id === userId
+        );
+        if (userIndex !== -1) {
+          rooms[roomCode].users[userIndex][ELEMENT] = newVALUE;
+          emitUpdateRoom(roomCode);
+        }
+      } catch (error) {
+        console.error("Error handling updateScore event:", error);
       }
     });
 
@@ -217,14 +214,7 @@ module.exports = (io) => {
           if (rooms[roomCode].users.length === 0) {
             delete rooms[roomCode];
           } else {
-            io.to(roomCode).emit(
-              "updateRoom",
-              rooms[roomCode].users,
-              rooms[roomCode].allReady,
-              rooms[roomCode].roomInfo,
-              rooms[roomCode].numberBegin,
-              rooms[roomCode].incrementAllReady
-            );
+            emitUpdateRoom(roomCode);
           }
         }
 
@@ -242,14 +232,5 @@ module.exports = (io) => {
         console.error("Error handling setUserName event:", error);
       }
     });
-
-    const getRoomList = () => {
-      return Object.keys(rooms).map((roomCode) => ({
-        roomCode,
-        allReady: rooms[roomCode].allReady,
-        roomInfo: rooms[roomCode].roomInfo,
-        numberOfUsers: rooms[roomCode].users.length,
-      }));
-    };
   });
 };
