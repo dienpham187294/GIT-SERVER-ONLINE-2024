@@ -28,6 +28,7 @@ app.get("/message", (req, res) => {
 });
 
 const server = http.createServer(app);
+
 const io = socketIo(server, {
   cors: {
     origin: "*", // Allow all origins, you can restrict this to specific domains
@@ -35,8 +36,10 @@ const io = socketIo(server, {
   },
 });
 
-routerIO(io); // Pass the io instance to the router
-message(io); // Pass the io instance to the router
+// Pass the io instance to the router modules
+routerIO(io);
+message(io);
+
 server.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });
