@@ -136,7 +136,11 @@ module.exports = (io) => {
         );
 
         if (userIndex !== -1) {
-          rooms[roomCode].users[userIndex].incrementReady = incrementReady;
+          if (rooms[roomCode].users[userIndex].isPause) {
+            rooms[roomCode].users[userIndex].incrementReady = true;
+          } else {
+            rooms[roomCode].users[userIndex].incrementReady = incrementReady;
+          }
 
           const incrementAllReady = rooms[roomCode].users.every(
             (user) => user.incrementReady || user.isPause
