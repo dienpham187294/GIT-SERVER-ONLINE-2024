@@ -139,7 +139,7 @@ module.exports = (io) => {
           rooms[roomCode].users[userIndex].incrementReady = incrementReady;
 
           const incrementAllReady = rooms[roomCode].users.every(
-            (user) => user.incrementReady && !user.isPause
+            (user) => user.incrementReady || user.isPause
           );
 
           rooms[roomCode].incrementAllReady = incrementAllReady;
@@ -179,21 +179,6 @@ module.exports = (io) => {
       }
     });
 
-    // socket.on("updateScore", (roomCode, userId, newScore) => {
-    //   try {
-    //     console.log("GETNEWSCORE", newScore);
-    //     const userIndex = rooms[roomCode]?.users.findIndex(
-    //       (user) => user.id === userId
-    //     );
-    //     if (userIndex !== -1) {
-    //       rooms[roomCode].users[userIndex].score = newScore;
-    //       emitUpdateRoom(roomCode);
-    //     }
-    //   } catch (error) {
-    //     console.error("Error handling updateScore event:", error);
-    //   }
-    // });
-
     socket.on("updateOneELEMENT", (roomCode, userId, ELEMENT, newVALUE) => {
       try {
         console.log("GETNEWVALUE", newVALUE);
@@ -203,6 +188,21 @@ module.exports = (io) => {
         if (userIndex !== -1) {
           rooms[roomCode].users[userIndex][ELEMENT] = newVALUE;
           emitUpdateRoom(roomCode);
+        }
+        if (ELEMENT === "isPause") {
+          console.log("isPause push new update infor to Client");
+          try {
+            if (userIndex !== -1) {
+              const incrementAllReady = rooms[roomCode].users.every(
+                (user) => user.incrementReady || user.isPause
+              );
+
+              rooms[roomCode].incrementAllReady = incrementAllReady;
+              emitUpdateRoom(roomCode);
+            }
+          } catch (error) {
+            console.log("Error handling incrementReadyChange event:", error);
+          }
         }
       } catch (error) {
         console.error("Error handling updateScore event:", error);
