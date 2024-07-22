@@ -65,12 +65,14 @@ module.exports = (io) => {
         };
         socket.join(roomCode);
         rooms[roomCode].users.push({
+          host: true,
           id: socket.id,
           name: socket.userName || "Unknown",
           isReady: false,
           incrementReady: false,
           score: 0, // Initialize score
           isPause: false,
+          logInTime: Date.now(),
         });
 
         console.log(JSON.stringify(rooms[roomCode].users));
@@ -98,6 +100,7 @@ module.exports = (io) => {
               incrementReady: false,
               score: 0, // Initialize score
               isPause: false,
+              logInTime: Date.now(),
             });
             emitUpdateRoom(roomCode);
           } else {
@@ -147,6 +150,7 @@ module.exports = (io) => {
           );
 
           rooms[roomCode].incrementAllReady = incrementAllReady;
+
           emitUpdateRoom(roomCode);
         }
       } catch (error) {
