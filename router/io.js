@@ -3,18 +3,24 @@ module.exports = (io) => {
   let connectedUsers = 0;
 
   io.on("connection", (socket) => {
-    console.log("New client connected LOCAL:", socket.id);
+    console.log("LOCAL CONNECTS MM:", socket.id);
 
-    const emitUpdateRoom = (roomCode) => {
+    const emitUpdateRoom = (roomCode, dataChange, mode) => {
+      console.log(mode);
       if (rooms[roomCode]) {
-        io.to(roomCode).emit(
-          "updateRoom",
-          rooms[roomCode].users,
-          rooms[roomCode].allReady,
-          rooms[roomCode].roomInfo,
-          rooms[roomCode].numberBegin,
-          rooms[roomCode].incrementAllReady
-        );
+        if (!dataChange) {
+          console.log("ALLLLLLL");
+          io.to(roomCode).emit("updateRoom", {
+            users: rooms[roomCode].users,
+            allReady: rooms[roomCode].allReady,
+            roomInfo: rooms[roomCode].roomInfo,
+            numberBegin: rooms[roomCode].numberBegin,
+            incrementAllReady: rooms[roomCode].incrementAllReady,
+          });
+        } else {
+          console.log("Apart");
+          io.to(roomCode).emit("updateRoom", dataChange);
+        }
       }
     };
 
@@ -44,7 +50,11 @@ module.exports = (io) => {
           if (rooms[roomCode].users.length === 0) {
             delete rooms[roomCode];
           } else {
-            emitUpdateRoom(roomCode);
+            emitUpdateRoom(
+              roomCode,
+              { users: rooms[roomCode].users },
+              "disconnect"
+            );
           }
         }
         io.emit("roomListUpdate", getRoomList());
@@ -74,8 +84,6 @@ module.exports = (io) => {
           isPause: false,
           logInTime: Date.now(),
         });
-
-        console.log(JSON.stringify(rooms[roomCode].users));
         callback(roomCode);
         io.emit("roomListUpdate", getRoomList());
       } catch (error) {
@@ -85,6 +93,7 @@ module.exports = (io) => {
 
     socket.on("joinRoom", (roomCode) => {
       try {
+        console.log("Join room ");
         // && !rooms[roomCode].allReady
         if (rooms[roomCode]) {
           const existingUser = rooms[roomCode].users.find(
@@ -97,15 +106,15 @@ module.exports = (io) => {
               id: socket.id,
               name: socket.userName || "Unknown",
               isReady: false,
-              incrementReady: false,
+              incrementReady: true,
               score: 0, // Initialize score
               isPause: false,
               logInTime: Date.now(),
             });
-            emitUpdateRoom(roomCode);
+
+            emitUpdateRoom(roomCode, false, "Join room");
           } else {
-            socket.emit("alreadyInRoom", roomCode);
-            emitUpdateRoom(roomCode);
+            emitUpdateRoom(roomCode, false, "In room");
           }
         } else {
           io.to(socket.id).emit("roomDoesNotExist", roomCode);
@@ -116,102 +125,227 @@ module.exports = (io) => {
       }
     });
 
-    socket.on("userReadyChange", (roomCode, isReady) => {
-      try {
-        const userIndex = rooms[roomCode]?.users.findIndex(
-          (user) => user.id === socket.id
-        );
-        if (userIndex !== -1) {
-          rooms[roomCode].users[userIndex].isReady = isReady;
-          const allReady = rooms[roomCode].users.every((user) => user.isReady);
-          rooms[roomCode].allReady = allReady;
-          emitUpdateRoom(roomCode);
-        }
-      } catch (error) {
-        console.log("Error handling userReadyChange event:", error);
-      }
-    });
+    // socket.on("userReadyChange", (roomCode, isReady) => {
+    //   try {
+    //     const userIndex = rooms[roomCode]?.users.findIndex(
+    //       (user) => user.id === socket.id
+    //     );
+    //     if (userIndex !== -1) {
+    //       rooms[roomCode].users[userIndex].isReady = isReady;
 
-    socket.on("incrementReadyChange", (roomCode, incrementReady) => {
-      try {
-        const userIndex = rooms[roomCode]?.users.findIndex(
-          (user) => user.id === socket.id
-        );
+    //       const allReady = rooms[roomCode].users.every((user) => user.isReady);
 
-        if (userIndex !== -1) {
-          if (rooms[roomCode].users[userIndex].isPause) {
-            rooms[roomCode].users[userIndex].incrementReady = true;
-          } else {
-            rooms[roomCode].users[userIndex].incrementReady = incrementReady;
-          }
+    //       rooms[roomCode].allReady = allReady;
 
-          const incrementAllReady = rooms[roomCode].users.every(
-            (user) => user.incrementReady || user.isPause
-          );
+    //       rooms[roomCode].incrementAllReady = true;
+    //       if (allReady) {
+    //         emitUpdateRoom(
+    //           roomCode,
+    //           { allReady: true, incrementAllReady: true },
+    //           "userChange"
+    //         );
+    //       } else {
+    //         emitUpdateRoom(
+    //           roomCode,
+    //           { users: rooms[roomCode].users },
+    //           "userChange"
+    //         );
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.log("Error handling userReadyChange event:", error);
+    //   }
+    // });
 
-          rooms[roomCode].incrementAllReady = incrementAllReady;
+    // socket.on("userReadyChange", (roomCode, isReady) => {
+    //   try {
+    //     const userIndex = rooms[roomCode]?.users.findIndex(
+    //       (user) => user.id === socket.id
+    //     );
+    //     if (userIndex !== -1) {
+    //       rooms[roomCode].users[userIndex].isReady = isReady;
 
-          emitUpdateRoom(roomCode);
-        }
-      } catch (error) {
-        console.log("Error handling incrementReadyChange event:", error);
-      }
-    });
+    //       const allReady = rooms[roomCode].users.every((user) => user.isReady);
 
-    socket.on("updateUserName", (roomCode, userId, newUserName) => {
-      try {
-        const userIndex = rooms[roomCode]?.users.findIndex(
-          (user) => user.id === userId
-        );
-        if (userIndex !== -1) {
-          rooms[roomCode].users[userIndex].name = newUserName;
-          emitUpdateRoom(roomCode);
-        }
-      } catch (error) {
-        console.error("Error handling updateUserName event:", error);
-      }
-    });
+    //       rooms[roomCode].allReady = allReady;
 
-    socket.on("incrementNumberBegin", (roomCode) => {
-      try {
-        if (rooms[roomCode] && rooms[roomCode].incrementAllReady) {
-          rooms[roomCode].numberBegin += 1;
-          rooms[roomCode].users.forEach(
-            (user) => (user.incrementReady = false)
-          );
-          rooms[roomCode].incrementAllReady = false;
-          emitUpdateRoom(roomCode);
-        }
-      } catch (error) {
-        console.error("Error handling incrementNumberBegin event:", error);
-      }
-    });
+    //       rooms[roomCode].incrementAllReady = true;
+    //       if (allReady) {
+    //         emitUpdateRoom(
+    //           roomCode,
+    //           { allReady: true, incrementAllReady: true },
+    //           "userChange"
+    //         );
+    //       } else {
+    //         emitUpdateRoom(
+    //           roomCode,
+    //           { users: rooms[roomCode].users },
+    //           "userChange"
+    //         );
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.log("Error handling userReadyChange event:", error);
+    //   }
+    // });
+
+    // socket.on("incrementReadyChange", (roomCode, incrementReady) => {
+    //   try {
+    //     const userIndex = rooms[roomCode]?.users.findIndex(
+    //       (user) => user.id === socket.id
+    //     );
+
+    //     if (userIndex !== -1) {
+    //       if (rooms[roomCode].users[userIndex].isPause) {
+    //         rooms[roomCode].users[userIndex].incrementReady = true;
+    //       } else {
+    //         rooms[roomCode].users[userIndex].incrementReady = incrementReady;
+    //       }
+    //       const incrementAllReady = rooms[roomCode].users.every(
+    //         (user) => user.incrementReady || user.isPause
+    //       );
+    //       rooms[roomCode].incrementAllReady = incrementAllReady;
+
+    //       if (incrementAllReady) {
+    //         emitUpdateRoom(
+    //           roomCode,
+    //           { incrementAllReady: true },
+    //           "incrementReadyChange"
+    //         );
+    //       }
+    //     }
+    //   } catch (error) {
+    //     console.log("Error handling incrementReadyChange event:", error);
+    //   }
+    // });
+
+    // socket.on("updateUserName", (roomCode, userId, newUserName) => {
+    //   try {
+    //     const userIndex = rooms[roomCode]?.users.findIndex(
+    //       (user) => user.id === userId
+    //     );
+    //     if (userIndex !== -1) {
+    //       rooms[roomCode].users[userIndex].name = newUserName;
+    //       emitUpdateRoom(
+    //         roomCode,
+    //         { users: rooms[roomCode].users },
+    //         "updateUserName"
+    //       );
+    //     }
+    //   } catch (error) {
+    //     console.error("Error handling updateUserName event:", error);
+    //   }
+    // });
+
+    // socket.on("incrementNumberBegin", (roomCode) => {
+    //   try {
+    //     if (rooms[roomCode]) {
+    //       rooms[roomCode].numberBegin += 1;
+    //       rooms[roomCode].users.forEach(
+    //         (user) => (user.incrementReady = false)
+    //       );
+    //       rooms[roomCode].incrementAllReady = false;
+
+    //       emitUpdateRoom(
+    //         roomCode,
+    //         {
+    //           users: rooms[roomCode].users,
+    //           numberBegin: rooms[roomCode].numberBegin,
+    //           incrementAllReady: false,
+    //         },
+    //         "incrementNumberBegin"
+    //       );
+    //     }
+    //   } catch (error) {
+    //     console.error("Error handling incrementNumberBegin event:", error);
+    //   }
+    // });
 
     socket.on("updateOneELEMENT", (roomCode, userId, ELEMENT, newVALUE) => {
       try {
-        console.log("GETNEWVALUE", newVALUE);
         const userIndex = rooms[roomCode]?.users.findIndex(
           (user) => user.id === userId
         );
         if (userIndex !== -1) {
           rooms[roomCode].users[userIndex][ELEMENT] = newVALUE;
-          emitUpdateRoom(roomCode);
-        }
-        if (ELEMENT === "isPause") {
-          console.log("isPause push new update infor to Client");
-          try {
-            if (userIndex !== -1) {
-              const incrementAllReady = rooms[roomCode].users.every(
-                (user) => user.incrementReady || user.isPause
-              );
 
-              rooms[roomCode].incrementAllReady = incrementAllReady;
-              emitUpdateRoom(roomCode);
+          if (rooms[roomCode].numberBegin === 0) {
+            console.log(0, rooms[roomCode].numberBegin);
+
+            const checkAllReady = rooms[roomCode].users.every(
+              (user) => user.isReady
+            );
+            if (checkAllReady) {
+              rooms[roomCode].numberBegin = 1;
+
+              rooms[roomCode].users.forEach((user) => {
+                user.incrementReady = false;
+              });
+              emitUpdateRoom(
+                roomCode,
+                {
+                  users: rooms[roomCode].users,
+                  allReady: true,
+                  numberBegin: 1,
+                },
+                "updateOneELEMENT"
+              );
+            } else {
+              emitUpdateRoom(
+                roomCode,
+                {
+                  users: rooms[roomCode].users,
+                },
+                "updateOneELEMENT"
+              );
             }
-          } catch (error) {
-            console.log("Error handling incrementReadyChange event:", error);
+          } else {
+            console.log(1);
+            const checkAllReady = rooms[roomCode].users.every(
+              (user) => user.incrementReady || user.isPause
+            );
+
+            if (checkAllReady) {
+              rooms[roomCode].numberBegin += 1;
+              rooms[roomCode].users.forEach((user) => {
+                user.incrementReady = false;
+              });
+              emitUpdateRoom(
+                roomCode,
+                {
+                  users: rooms[roomCode].users,
+                  numberBegin: rooms[roomCode].numberBegin,
+                },
+                "updateOneELEMENT"
+              );
+            } else {
+              emitUpdateRoom(
+                roomCode,
+                {
+                  users: rooms[roomCode].users,
+                },
+                "updateOneELEMENT"
+              );
+            }
           }
+
+          // emitUpdateRoom(roomCode, false, "updateOneELEMENT");
         }
+        // if (ELEMENT === "isPause") {
+        //   console.log("isPause push new update infor to Client");
+        //   try {
+        //     if (userIndex !== -1) {
+        //       const incrementAllReady = rooms[roomCode].users.every(
+        //         (user) => user.incrementReady || user.isPause
+        //       );
+
+        //       rooms[roomCode].incrementAllReady = incrementAllReady;
+        //       emitUpdateRoom(roomCode, false, "updateOneELEMENT");
+        //     }
+        //   } catch (error) {
+        //     console.log("Error handling incrementReadyChange event:", error);
+        //   }
+        // }
       } catch (error) {
         console.error("Error handling updateScore event:", error);
       }
@@ -227,7 +361,11 @@ module.exports = (io) => {
           if (rooms[roomCode].users.length === 0) {
             delete rooms[roomCode];
           } else {
-            emitUpdateRoom(roomCode);
+            emitUpdateRoom(
+              roomCode,
+              { users: rooms[roomCode].users },
+              "getRoomList"
+            );
           }
         }
 
@@ -238,12 +376,12 @@ module.exports = (io) => {
       }
     });
 
-    socket.on("setUserName", (userName) => {
-      try {
-        socket.userName = userName;
-      } catch (error) {
-        console.error("Error handling setUserName event:", error);
-      }
-    });
+    // socket.on("setUserName", (userName) => {
+    //   try {
+    //     socket.userName = userName;
+    //   } catch (error) {
+    //     console.error("Error handling setUserName event:", error);
+    //   }
+    // });
   });
 };
