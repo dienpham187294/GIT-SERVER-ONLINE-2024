@@ -93,7 +93,7 @@ module.exports = (io) => {
 
     socket.on("joinRoom", (roomCode) => {
       try {
-        console.log("Join room ");
+        // console.log("Join room ");
         // && !rooms[roomCode].allReady
         if (rooms[roomCode]) {
           const existingUser = rooms[roomCode].users.find(
@@ -142,105 +142,135 @@ module.exports = (io) => {
       }
     });
 
-    socket.on("updateOneELEMENT", (roomCode, userId, ELEMENT, newVALUE) => {
-      try {
-        const userIndex = rooms[roomCode]?.users.findIndex(
-          (user) => user.id === userId
-        );
-        if (userIndex !== -1) {
-          rooms[roomCode].users[userIndex][ELEMENT] = newVALUE;
+    socket.on(
+      "updateOneELEMENT",
+      (roomCode, userId, ELEMENT, newVALUE, mode) => {
+        try {
+          const userIndex = rooms[roomCode]?.users.findIndex(
+            (user) => user.id === userId
+          );
 
-          if (rooms[roomCode].numberBegin === 0) {
-            console.log(0, rooms[roomCode].numberBegin);
+          if (userIndex !== -1) {
+            rooms[roomCode].users[userIndex][ELEMENT] = newVALUE;
 
-            const checkAllReady = rooms[roomCode].users.every(
-              (user) => user.isReady
-            );
-            if (checkAllReady) {
-              rooms[roomCode].numberBegin = 1;
-
-              rooms[roomCode].users.forEach((user) => {
-                user.incrementReady = false;
-              });
+            if (mode === "reset") {
+              rooms[roomCode].allReady = false;
+              // rooms[roomCode].users[userIndex]["incrementReady"] = false;
               emitUpdateRoom(
                 roomCode,
                 {
-                  users: rooms[roomCode].users,
-                  allReady: true,
-                  numberBegin: 1,
-                },
-                "updateOneELEMENT"
-              );
-            } else {
-              emitUpdateRoom(
-                roomCode,
-                {
+                  allReady: rooms[roomCode].allReady,
                   users: rooms[roomCode].users,
                 },
-                "updateOneELEMENT"
+                "updateOneELEMENT-reset"
               );
+              return;
             }
-          } else {
-            let checkAllReady = false;
 
-            // Check if all users are paused
-            let checkAllPause = rooms[roomCode].users.every(
-              (user) => user.isPause
-            );
-
-            // Check if all users are either ready to increment or paused
-            let checkAllReadyIncrement = rooms[roomCode].users.every(
-              (user) => user.incrementReady || user.isPause
-            );
-
-            // Update checkAllReady based on the conditions
-            checkAllReady = checkAllReadyIncrement && !checkAllPause;
-
-            if (checkAllReady) {
-              rooms[roomCode].numberBegin += 1;
-              rooms[roomCode].users.forEach((user) => {
-                user.incrementReady = false;
-              });
-              emitUpdateRoom(
-                roomCode,
-                {
-                  users: rooms[roomCode].users,
-                  numberBegin: rooms[roomCode].numberBegin,
-                },
-                "updateOneELEMENT"
-              );
-            } else {
+            if (mode === "normal") {
               emitUpdateRoom(
                 roomCode,
                 {
                   users: rooms[roomCode].users,
                 },
-                "updateOneELEMENT"
+                "updateOneELEMENT-normal"
               );
+
+              return;
             }
+
+            if (!rooms[roomCode].allReady) {
+              console.log(0, rooms[roomCode].numberBegin);
+
+              const checkAllReady = rooms[roomCode].users.every(
+                (user) => user.isReady
+              );
+              if (checkAllReady) {
+                rooms[roomCode].numberBegin += 1;
+                rooms[roomCode].allReady = true;
+                rooms[roomCode].users.forEach((user) => {
+                  user.incrementReady = false;
+                });
+                emitUpdateRoom(
+                  roomCode,
+                  {
+                    users: rooms[roomCode].users,
+                    allReady: rooms[roomCode].allReady,
+                    numberBegin: rooms[roomCode].numberBegin,
+                  },
+                  "updateOneELEMENT-notnormal-01"
+                );
+              } else {
+                emitUpdateRoom(
+                  roomCode,
+                  {
+                    users: rooms[roomCode].users,
+                  },
+                  "updateOneELEMENT-notnormal-02"
+                );
+              }
+            } else {
+              let checkAllReady = false;
+
+              // Check if all users are paused
+              let checkAllPause = rooms[roomCode].users.every(
+                (user) => user.isPause
+              );
+
+              // Check if all users are either ready to increment or paused
+              let checkAllReadyIncrement = rooms[roomCode].users.every(
+                (user) => user.incrementReady || user.isPause
+              );
+
+              // Update checkAllReady based on the conditions
+              checkAllReady = checkAllReadyIncrement && !checkAllPause;
+
+              if (checkAllReady) {
+                rooms[roomCode].numberBegin += 1;
+                rooms[roomCode].users.forEach((user) => {
+                  user.incrementReady = false;
+                });
+                emitUpdateRoom(
+                  roomCode,
+                  {
+                    users: rooms[roomCode].users,
+                    numberBegin: rooms[roomCode].numberBegin,
+                  },
+                  "updateOneELEMENT-notnormal-03"
+                );
+              } else {
+                emitUpdateRoom(
+                  roomCode,
+                  {
+                    users: rooms[roomCode].users,
+                  },
+                  "updateOneELEMENT-notnormal-04"
+                );
+              }
+            }
+
+            // emitUpdateRoom(roomCode, false, "updateOneELEMENT");
           }
+          // if (ELEMENT === "isPause") {
+          //   console.log("isPause push new update infor to Client");
+          //   try {
+          //     if (userIndex !== -1) {
+          //       const incrementAllReady = rooms[roomCode].users.every(
+          //         (user) => user.incrementReady || user.isPause
+          //       );
 
-          // emitUpdateRoom(roomCode, false, "updateOneELEMENT");
+          //       rooms[roomCode].incrementAllReady = incrementAllReady;
+          //       emitUpdateRoom(roomCode, false, "updateOneELEMENT");
+          //     }
+          //   } catch (error) {
+          //     console.log("Error handling incrementReadyChange event:", error);
+          //   }
+          // }
+        } catch (error) {
+          console.error("Error handling updateScore event:", error);
         }
-        // if (ELEMENT === "isPause") {
-        //   console.log("isPause push new update infor to Client");
-        //   try {
-        //     if (userIndex !== -1) {
-        //       const incrementAllReady = rooms[roomCode].users.every(
-        //         (user) => user.incrementReady || user.isPause
-        //       );
-
-        //       rooms[roomCode].incrementAllReady = incrementAllReady;
-        //       emitUpdateRoom(roomCode, false, "updateOneELEMENT");
-        //     }
-        //   } catch (error) {
-        //     console.log("Error handling incrementReadyChange event:", error);
-        //   }
-        // }
-      } catch (error) {
-        console.error("Error handling updateScore event:", error);
       }
-    });
+    );
 
     socket.on("getRoomList", () => {
       try {
