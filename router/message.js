@@ -16,6 +16,14 @@ module.exports = (io) => {
       }
     });
 
+    socket.on("messageReg", (message) => {
+      try {
+        io.emit("message", message);
+      } catch (error) {
+        console.error("Error handling message event:", error);
+      }
+    });
+
     socket.on("disconnect", () => {
       io.emit("onlineNumber", io.engine.clientsCount);
     });

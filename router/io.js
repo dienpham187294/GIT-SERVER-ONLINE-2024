@@ -108,7 +108,7 @@ module.exports = (io) => {
               isReady: false,
               incrementReady: true,
               score: 0, // Initialize score
-              isPause: false,
+              isPause: rooms[roomCode].allReady,
               logInTime: Date.now(),
             });
 
@@ -181,10 +181,20 @@ module.exports = (io) => {
               );
             }
           } else {
-            console.log(1);
-            const checkAllReady = rooms[roomCode].users.every(
+            let checkAllReady = false;
+
+            // Check if all users are paused
+            let checkAllPause = rooms[roomCode].users.every(
+              (user) => user.isPause
+            );
+
+            // Check if all users are either ready to increment or paused
+            let checkAllReadyIncrement = rooms[roomCode].users.every(
               (user) => user.incrementReady || user.isPause
             );
+
+            // Update checkAllReady based on the conditions
+            checkAllReady = checkAllReadyIncrement && !checkAllPause;
 
             if (checkAllReady) {
               rooms[roomCode].numberBegin += 1;
