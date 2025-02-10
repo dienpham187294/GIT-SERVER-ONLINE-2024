@@ -1,6 +1,5 @@
 module.exports = (io) => {
   const messageHistory = [];
-
   io.on("connection", (socket) => {
     socket.emit("onlineNumber", io.engine.clientsCount);
 
