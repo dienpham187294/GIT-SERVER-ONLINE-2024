@@ -8,8 +8,12 @@ module.exports = (io) => {
     socket.on("message", (message) => {
       try {
         console.log("Message received: ", message);
-        messageHistory.push(message);
-        io.emit("message", message);
+        if (message.includes("CMD_clear")) {
+          messageHistory = []; // Clears the message history
+        } else {
+          messageHistory.push(message); // Adds the new message to the history
+          io.emit("message", message); // Emits the new message to all connected clients
+        }
       } catch (error) {
         console.error("Error handling message event:", error);
       }
