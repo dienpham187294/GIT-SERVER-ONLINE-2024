@@ -14,7 +14,7 @@ module.exports = (io) => {
         console.error("Error handling message event:", error);
       }
       try {
-        if (message.includes("CMD_clear")) {
+        if (message.text.includes("CMD_clear")) {
           messageHistory = []; // Clears the message history
         }
       } catch (error) {}
