@@ -1,5 +1,5 @@
 module.exports = (io) => {
-  const messageHistory = [];
+  let messageHistory = [];
   io.on("connection", (socket) => {
     socket.emit("onlineNumber", io.engine.clientsCount);
 
@@ -7,17 +7,17 @@ module.exports = (io) => {
 
     socket.on("message", (message) => {
       try {
-        messageHistory.push(message); // Adds the new message to the history
+        // Adds the new message to the history
+        if (message.text.includes("CMD_clear")) {
+          messageHistory = []; // Clears the message history
+        } else {
+          messageHistory.push(message);
+        }
         io.emit("message", message); // Emits the new message to all connected clients
-        console.log("Message received: ", message);
+        console.log("Message receivedA: ", message);
       } catch (error) {
         console.error("Error handling message event:", error);
       }
-      try {
-        if (message.text.includes("CMD_clear")) {
-          messageHistory = []; // Clears the message history
-        }
-      } catch (error) {}
     });
 
     socket.on("messageReg", (message) => {
