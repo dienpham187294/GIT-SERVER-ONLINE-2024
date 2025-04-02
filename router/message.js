@@ -1,9 +1,13 @@
 module.exports = (io) => {
   let messageHistory = [];
+  let messageNotifyHistory = [];
   io.on("connection", (socket) => {
     socket.emit("onlineNumber", io.engine.clientsCount);
 
-    socket.emit("messageHistory", messageHistory);
+    socket.emit(
+      "messageHistory",
+      messageHistory.concat(messageNotifyHistory.slice(-10))
+    );
 
     socket.on("message", (message) => {
       try {
@@ -22,6 +26,7 @@ module.exports = (io) => {
 
     socket.on("messageReg", (message) => {
       try {
+        messageNotifyHistory.push(message);
         io.emit("message", message);
       } catch (error) {
         console.error("Error handling message event:", error);
