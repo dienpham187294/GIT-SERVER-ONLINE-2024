@@ -17,6 +17,9 @@ module.exports = (io) => {
           messageNotifyHistory = [];
         } else {
           messageHistory.push(message);
+          if (messageHistory.length > 10) {
+            messageHistory.shift(); // Xóa phần tử đầu tiên (cũ nhất)
+          }
         }
         io.emit("message", message); // Emits the new message to all connected clients
         console.log("Message receivedA: ", message);
