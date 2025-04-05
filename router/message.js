@@ -14,6 +14,7 @@ module.exports = (io) => {
         // Adds the new message to the history
         if (message.text.includes("CMD_clear")) {
           messageHistory = []; // Clears the message history
+          messageNotifyHistory = [];
         } else {
           messageHistory.push(message);
         }
@@ -26,6 +27,11 @@ module.exports = (io) => {
 
     socket.on("messageReg", (message) => {
       try {
+        // Lọc bỏ các phần tử trùng id
+        messageNotifyHistory = messageNotifyHistory.filter(
+          (item) => item.id !== message.id
+        );
+        // Thêm message vào cuối mảng
         messageNotifyHistory.push(message);
         io.emit("message", message);
       } catch (error) {
