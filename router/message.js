@@ -6,7 +6,7 @@ module.exports = (io) => {
 
     socket.emit(
       "messageHistory",
-      messageHistory.concat(messageNotifyHistory.slice(-10))
+      messageHistory.concat(messageNotifyHistory.slice(-5))
     );
 
     socket.on("message", (message) => {
@@ -17,7 +17,7 @@ module.exports = (io) => {
           messageNotifyHistory = [];
         } else {
           messageHistory.push(message);
-          if (messageHistory.length > 10) {
+          if (messageHistory.length > 5) {
             messageHistory.shift(); // Xóa phần tử đầu tiên (cũ nhất)
           }
         }
