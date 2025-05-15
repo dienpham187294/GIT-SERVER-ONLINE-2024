@@ -9,7 +9,7 @@ const message = require("./router/message");
 const bodyParser = require("body-parser");
 const jsonParser = bodyParser.json();
 const app = express();
-
+const { RegAnalyze } = require("./ulti/reg_analyze");
 // Configure CORS
 const corsOptions = {
   origin: "*", // Allow all origins, you can restrict this to specific domains
@@ -44,10 +44,41 @@ app.get("/test", (req, res) => {
   res.json({ message: "Success from GET /test" });
 });
 
-// Keep the existing POST route for /test
-app.post("/test", jsonParser, (req, res) => {
-  console.log("POST test success", req.body);
-  res.json({ message: "Success from POST /test" });
+/**
+ * Route handler for analyzing transcript text against command lists
+ * Expects JSON body with transcript, CMDlist, and numberTry fields
+ */
+app.post("/reg-Analyze", jsonParser, (req, res) => {
+  try {
+    // Validate required request parameters
+    const { transcript, CMDlist, numberTry } = req.body;
+
+    if (!transcript || !CMDlist) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required parameters: transcript and CMDlist are required",
+      });
+    }
+
+    // Process the request with RegAnalyze
+    const analysisResults = RegAnalyze(transcript, CMDlist, numberTry);
+
+    // Return successful response
+    return res.status(200).json({
+      success: true,
+      message: "Analysis completed successfully",
+      data: analysisResults,
+    });
+  } catch (error) {
+    // Handle any unexpected errors
+    console.error("Error in /reg-Analyze:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error processing request",
+      error: error.message,
+    });
+  }
 });
 
 // Create the server
