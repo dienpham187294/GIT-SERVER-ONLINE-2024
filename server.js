@@ -10,6 +10,9 @@ const bodyParser = require("body-parser");
 const jsonParser = bodyParser.json();
 const app = express();
 const { RegAnalyze } = require("./ulti/reg_analyze");
+const { RegAnalyzeInPrac } = require("./ulti/reg_analyze_inprac");
+const { GetDataPracInCustom } = require("./ulti/get_data_prac_in_custom");
+const { sendmailDK } = require("./ulti/get_homework_and_email");
 // Configure CORS
 const corsOptions = {
   origin: "*", // Allow all origins, you can restrict this to specific domains
@@ -51,7 +54,7 @@ app.get("/test", (req, res) => {
 app.post("/reg-Analyze", jsonParser, (req, res) => {
   try {
     // Validate required request parameters
-    const { transcript, CMDlist, numberTry } = req.body;
+    const { transcript, CMDlist } = req.body;
 
     if (!transcript || !CMDlist) {
       return res.status(400).json({
@@ -62,7 +65,7 @@ app.post("/reg-Analyze", jsonParser, (req, res) => {
     }
 
     // Process the request with RegAnalyze
-    const analysisResults = RegAnalyze(transcript, CMDlist, numberTry);
+    const analysisResults = RegAnalyze(transcript, CMDlist);
 
     // Return successful response
     return res.status(200).json({
@@ -73,6 +76,111 @@ app.post("/reg-Analyze", jsonParser, (req, res) => {
   } catch (error) {
     // Handle any unexpected errors
     console.error("Error in /reg-Analyze:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error processing request",
+      error: error.message,
+    });
+  }
+});
+
+app.post("/reg-Analyze-in-prac", jsonParser, (req, res) => {
+  try {
+    // Validate required request parameters
+    const { RegInput, CMDlist, regRate_01 } = req.body;
+
+    if (!RegInput || !CMDlist) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required parameters: transcript and CMDlist are required",
+      });
+    }
+
+    // Process the request with RegAnalyze
+    const analysisResults = RegAnalyzeInPrac(RegInput, CMDlist, regRate_01);
+
+    // Return successful response
+    return res.status(200).json({
+      success: true,
+      message: "Analysis completed successfully",
+      data: analysisResults,
+    });
+  } catch (error) {
+    // Handle any unexpected errors
+    console.error("Error in /reg-Analyze:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error processing request",
+      error: error.message,
+    });
+  }
+});
+app.post(
+  "/reg-Analyze-get_data_prac_in_custom-prac",
+  jsonParser,
+  (req, res) => {
+    try {
+      // Validate required request parameters
+      const {
+        data_all,
+        index_sets_t_get_pracData,
+        filerSets,
+        upCode,
+        random,
+        fsp,
+      } = req.body;
+
+      // Process the request with RegAnalyze
+      const analysisResults = GetDataPracInCustom(
+        data_all,
+        index_sets_t_get_pracData,
+        filerSets,
+        upCode,
+        random,
+        fsp
+      );
+
+      // Return successful response
+      return res.status(200).json({
+        success: true,
+        message: "Analysis completed successfully",
+        data: analysisResults,
+      });
+    } catch (error) {
+      // Handle any unexpected errors
+      console.error("Error in /reg-Analyze:", error.message);
+      return res.status(500).json({
+        success: false,
+        message: "Server error processing request",
+        error: error.message,
+      });
+    }
+  }
+);
+
+app.post("/mail-homework", jsonParser, (req, res) => {
+  try {
+    const { subjectText, contentText, toEmail } = req.body;
+
+    if (!subjectText || !contentText) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: subjectText or contentText",
+      });
+    }
+
+    // Use default email if toEmail is not provided
+    const recipientEmail = toEmail || "dienpham187294@gmail.com";
+
+    sendmailDK(subjectText, contentText, recipientEmail);
+
+    return res.status(200).json({
+      success: true,
+      message: "Mail sent successfully",
+    });
+  } catch (error) {
+    console.error("Error in /mail-homework:", error.message);
     return res.status(500).json({
       success: false,
       message: "Server error processing request",

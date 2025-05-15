@@ -8,7 +8,7 @@ const levenshtein = require("js-levenshtein");
  * @param {number} numberTry - Number of attempts made (affects output formatting)
  * @returns {Object} Result with analyzed segments and combined text
  */
-function RegAnalyze(transcript, CMDlist, numberTry) {
+function RegAnalyze(transcript, CMDlist) {
   if (!transcript || !CMDlist) {
     return {
       resultSt: [],
