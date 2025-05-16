@@ -1,22 +1,31 @@
+// Import statements
+import express from "express";
+import cors from "cors";
+import http from "http";
+import { Server as SocketIOServer } from "socket.io";
+import bodyParser from "body-parser";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+import googleTTS from "google-tts-api";
+import { fileURLToPath } from "url";
+
+// Import local modules
+import routerIO from "./router/io.js";
+import message from "./router/message.js";
+import { RegAnalyze } from "./ulti/reg_analyze.js";
+import { RegAnalyzeInPrac } from "./ulti/reg_analyze_inprac.js";
+import { GetDataPracInCustom } from "./ulti/get_data_prac_in_custom.js";
+import { sendmailDK } from "./ulti/get_homework_and_email.js";
+
+// Environment variables
 const port = process.env.PORT || 5000;
-const express = require("express");
-const cors = require("cors");
-const http = require("http");
-const socketIo = require("socket.io");
-const routerIO = require("./router/io");
-const message = require("./router/message");
-// const getData_for_practicing = require("./router/data_practicing_post");
-const bodyParser = require("body-parser");
-const jsonParser = bodyParser.json();
+
+// Express app initialization
 const app = express();
-const { RegAnalyze } = require("./ulti/reg_analyze");
-const { RegAnalyzeInPrac } = require("./ulti/reg_analyze_inprac");
-const { GetDataPracInCustom } = require("./ulti/get_data_prac_in_custom");
-const { sendmailDK } = require("./ulti/get_homework_and_email");
+const jsonParser = bodyParser.json();
+
 // Configure CORS
-
-const googleTTS = require("google-tts-api");
-
 const corsOptions = {
   origin: "*", // Allow all origins, you can restrict this to specific domains
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -29,9 +38,8 @@ const corsOptions = {
   ],
 };
 
+// Middleware
 app.use(cors(corsOptions));
-
-// Add body parser middleware - THIS IS CRUCIAL
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -58,7 +66,6 @@ app.post("/reg-Analyze", jsonParser, (req, res) => {
   try {
     // Validate required request parameters
     const { transcript, CMDlist } = req.body;
-
     if (!transcript || !CMDlist) {
       return res.status(400).json({
         success: false,
@@ -66,10 +73,8 @@ app.post("/reg-Analyze", jsonParser, (req, res) => {
           "Missing required parameters: transcript and CMDlist are required",
       });
     }
-
     // Process the request with RegAnalyze
     const analysisResults = RegAnalyze(transcript, CMDlist);
-
     // Return successful response
     return res.status(200).json({
       success: true,
@@ -91,7 +96,6 @@ app.post("/reg-Analyze-in-prac", jsonParser, (req, res) => {
   try {
     // Validate required request parameters
     const { RegInput, CMDlist, regRate_01 } = req.body;
-
     if (!RegInput || !CMDlist) {
       return res.status(400).json({
         success: false,
@@ -99,10 +103,8 @@ app.post("/reg-Analyze-in-prac", jsonParser, (req, res) => {
           "Missing required parameters: transcript and CMDlist are required",
       });
     }
-
     // Process the request with RegAnalyze
     const analysisResults = RegAnalyzeInPrac(RegInput, CMDlist, regRate_01);
-
     // Return successful response
     return res.status(200).json({
       success: true,
@@ -119,6 +121,7 @@ app.post("/reg-Analyze-in-prac", jsonParser, (req, res) => {
     });
   }
 });
+
 app.post(
   "/reg-Analyze-get_data_prac_in_custom-prac",
   jsonParser,
@@ -133,7 +136,6 @@ app.post(
         random,
         fsp,
       } = req.body;
-
       // Process the request with RegAnalyze
       const analysisResults = GetDataPracInCustom(
         data_all,
@@ -143,7 +145,6 @@ app.post(
         random,
         fsp
       );
-
       // Return successful response
       return res.status(200).json({
         success: true,
@@ -165,19 +166,15 @@ app.post(
 app.post("/mail-homework", jsonParser, (req, res) => {
   try {
     const { subjectText, contentText, toEmail } = req.body;
-
     if (!subjectText || !contentText) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields: subjectText or contentText",
       });
     }
-
     // Use default email if toEmail is not provided
     const recipientEmail = toEmail || "dienpham187294@gmail.com";
-
     sendmailDK(subjectText, contentText, recipientEmail);
-
     return res.status(200).json({
       success: true,
       message: "Mail sent successfully",
@@ -192,32 +189,55 @@ app.post("/mail-homework", jsonParser, (req, res) => {
   }
 });
 
-// ======= Bộ nhớ cache (RAM) =========
-const ttsCache = new Map();
+// TTS cache setup
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CACHE_DIR = path.resolve(__dirname, "./tts_cache");
 
-// ======= Hàng đợi xử lý =========
+if (!fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR);
+}
+
 let ttsQueue = [];
 let isProcessing = false;
 
+function getCachePath(text) {
+  const hash = crypto.createHash("md5").update(text).digest("hex");
+  return path.join(CACHE_DIR, `${hash}.mp3`);
+}
+
 async function processQueue() {
   if (isProcessing || ttsQueue.length === 0) return;
-
   isProcessing = true;
   const { text, res } = ttsQueue.shift();
-
+  const cachePath = getCachePath(text);
   try {
+    // Nếu cache tồn tại lúc đang xử lý
+    if (fs.existsSync(cachePath)) {
+      fs.createReadStream(cachePath)
+        .on("open", () => {
+          res.set({
+            "Content-Type": "audio/mpeg",
+            "Content-Disposition": 'inline; filename="speech.mp3"',
+          });
+        })
+        .pipe(res)
+        .on("finish", () => {
+          isProcessing = false;
+          setTimeout(processQueue, 1000);
+        });
+      return;
+    }
+    // Chưa có cache, gọi Google TTS
     const url = googleTTS.getAudioUrl(text, {
       lang: "en",
       slow: true,
     });
-
     const audioRes = await fetch(url);
     const arrayBuffer = await audioRes.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-
-    // Lưu vào cache (key là text, value là Buffer)
-    ttsCache.set(text, buffer);
-
+    // Lưu file cache
+    fs.writeFileSync(cachePath, buffer);
     res.set({
       "Content-Type": "audio/mpeg",
       "Content-Disposition": 'inline; filename="speech.mp3"',
@@ -228,42 +248,36 @@ async function processQueue() {
     res.status(500).send("TTS failed");
   } finally {
     isProcessing = false;
-    setTimeout(processQueue, 1000); // Delay để tránh spam Google
+    setTimeout(processQueue, 1000); // tránh spam
   }
 }
 
-// ======= API Endpoint =========
 app.post("/tts", (req, res) => {
   const text = req.body.text?.trim();
   if (!text) return res.status(400).send("Missing text");
-
-  // Nếu đã có trong cache => trả luôn
-  if (ttsCache.has(text)) {
-    const cachedBuffer = ttsCache.get(text);
-    res.set({
-      "Content-Type": "audio/mpeg",
-      "Content-Disposition": 'inline; filename="speech.mp3"',
-    });
-    return res.send(cachedBuffer);
+  const cachePath = getCachePath(text);
+  // Trả cache nếu có
+  if (fs.existsSync(cachePath)) {
+    return fs
+      .createReadStream(cachePath)
+      .on("open", () => {
+        res.set({
+          "Content-Type": "audio/mpeg",
+          "Content-Disposition": 'inline; filename="speech.mp3"',
+        });
+      })
+      .pipe(res);
   }
-
-  // Chưa có => thêm vào hàng đợi
+  // Thêm vào queue xử lý
   ttsQueue.push({ text, res });
-  processQueue(); // gọi xử lý nếu chưa chạy
-});
-
-app.post("/tts", async (req, res) => {
-  const text = req.body.text;
-  if (!text) return res.status(400).send("Missing text");
-  ttsQueue.push({ text, res });
-  processQueue(); // gọi xử lý nếu chưa xử lý
+  processQueue();
 });
 
 // Create the server
 const server = http.createServer(app);
 
 // Setup Socket.IO
-const io = socketIo(server, {
+const io = new SocketIOServer(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
@@ -273,7 +287,6 @@ const io = socketIo(server, {
 // Pass the io instance to the router modules
 routerIO(io);
 message(io);
-// getData_for_practicing();
 
 // Start the server
 server.listen(port, () => {

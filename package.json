@@ -13,7 +13,9 @@
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "express": "^4.19.2",
+    "fs": "^0.0.1-security",
     "google-tts-api": "^2.0.2",
     "js-levenshtein": "^1.1.6",
     "nodemailer": "^7.0.3",
