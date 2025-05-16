@@ -10,12 +10,12 @@ async function sendmailDK(
       service: "gmail",
       auth: {
         user: "dienpham187294@gmail.com",
-        pass: "rqccbitaohabcrzv", // Consider storing this in an environment variable
+        pass: "rqccbitaohabcrzv", // Nên lưu vào biến môi trường để bảo mật
       },
     });
 
     const mailOptions = {
-      from: "dienpham187294@gmail.com",
+      from: '"Cùng thực hành" <dienpham187294@gmail.com>',
       to: toEmail,
       subject: subjectText,
       html: `
@@ -32,11 +32,6 @@ async function sendmailDK(
     console.log("Email sent:", info.response);
   } catch (error) {
     console.error("Error sending email:", error);
-
-    // Optional retry logic example (commented out):
-    // if (retryCount === 0) {
-    //   setTimeout(() => sendmailDK(subjectText, contentText, toEmail, 1), 2000);
-    // }
   }
 }
 
