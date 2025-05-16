@@ -192,60 +192,71 @@ app.post("/mail-homework", jsonParser, (req, res) => {
   }
 });
 
-// Server-side code - fixed version
+// ======= Bộ nhớ cache (RAM) =========
+const ttsCache = new Map();
+
+// ======= Hàng đợi xử lý =========
+let ttsQueue = [];
+let isProcessing = false;
+
+async function processQueue() {
+  if (isProcessing || ttsQueue.length === 0) return;
+
+  isProcessing = true;
+  const { text, res } = ttsQueue.shift();
+
+  try {
+    const url = googleTTS.getAudioUrl(text, {
+      lang: "en",
+      slow: true,
+    });
+
+    const audioRes = await fetch(url);
+    const arrayBuffer = await audioRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Lưu vào cache (key là text, value là Buffer)
+    ttsCache.set(text, buffer);
+
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Disposition": 'inline; filename="speech.mp3"',
+    });
+    res.send(buffer);
+  } catch (err) {
+    console.error("TTS error:", err);
+    res.status(500).send("TTS failed");
+  } finally {
+    isProcessing = false;
+    setTimeout(processQueue, 1000); // Delay để tránh spam Google
+  }
+}
+
+// ======= API Endpoint =========
+app.post("/tts", (req, res) => {
+  const text = req.body.text?.trim();
+  if (!text) return res.status(400).send("Missing text");
+
+  // Nếu đã có trong cache => trả luôn
+  if (ttsCache.has(text)) {
+    const cachedBuffer = ttsCache.get(text);
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Disposition": 'inline; filename="speech.mp3"',
+    });
+    return res.send(cachedBuffer);
+  }
+
+  // Chưa có => thêm vào hàng đợi
+  ttsQueue.push({ text, res });
+  processQueue(); // gọi xử lý nếu chưa chạy
+});
+
 app.post("/tts", async (req, res) => {
   const text = req.body.text;
   if (!text) return res.status(400).send("Missing text");
-  console.log("tts request:", text);
-
-  try {
-    // getAudioUrl returns a Promise, so we need to await it
-    const url = await googleTTS.getAudioUrl(text, {
-      lang: "en",
-      slow: false,
-      host: "https://translate.google.com",
-    });
-
-    console.log("Generated TTS URL:", url);
-
-    // Option 1: Fetch the audio data and proxy it through your server
-    // This can help bypass any CORS or referer restrictions
-    /* 
-    const audioResponse = await fetch(url, {
-      headers: {
-        'Referer': 'https://translate.google.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-    
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
-    }
-    
-    const audioBuffer = await audioResponse.arrayBuffer();
-    res.set('Content-Type', 'audio/mpeg');
-    res.send(Buffer.from(audioBuffer));
-    */
-
-    // Option 2: Just return the URL (current approach)
-    res.json({
-      success: true,
-      audioUrl: url,
-      // For compatibility with code expecting audioUrls
-      audioUrls: [
-        {
-          url: url,
-          text: text,
-        },
-      ],
-    });
-  } catch (err) {
-    console.error("TTS Error:", err);
-    res.status(500).json({
-      success: false,
-      error: "TTS failed: " + err.message,
-    });
-  }
+  ttsQueue.push({ text, res });
+  processQueue(); // gọi xử lý nếu chưa xử lý
 });
 
 // Create the server
