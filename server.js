@@ -14,6 +14,9 @@ const { RegAnalyzeInPrac } = require("./ulti/reg_analyze_inprac");
 const { GetDataPracInCustom } = require("./ulti/get_data_prac_in_custom");
 const { sendmailDK } = require("./ulti/get_homework_and_email");
 // Configure CORS
+
+const googleTTS = require("google-tts-api");
+
 const corsOptions = {
   origin: "*", // Allow all origins, you can restrict this to specific domains
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -185,6 +188,62 @@ app.post("/mail-homework", jsonParser, (req, res) => {
       success: false,
       message: "Server error processing request",
       error: error.message,
+    });
+  }
+});
+
+// Server-side code - fixed version
+app.post("/tts", async (req, res) => {
+  const text = req.body.text;
+  if (!text) return res.status(400).send("Missing text");
+  console.log("tts request:", text);
+
+  try {
+    // getAudioUrl returns a Promise, so we need to await it
+    const url = await googleTTS.getAudioUrl(text, {
+      lang: "en",
+      slow: false,
+      host: "https://translate.google.com",
+    });
+
+    console.log("Generated TTS URL:", url);
+
+    // Option 1: Fetch the audio data and proxy it through your server
+    // This can help bypass any CORS or referer restrictions
+    /* 
+    const audioResponse = await fetch(url, {
+      headers: {
+        'Referer': 'https://translate.google.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!audioResponse.ok) {
+      throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
+    }
+    
+    const audioBuffer = await audioResponse.arrayBuffer();
+    res.set('Content-Type', 'audio/mpeg');
+    res.send(Buffer.from(audioBuffer));
+    */
+
+    // Option 2: Just return the URL (current approach)
+    res.json({
+      success: true,
+      audioUrl: url,
+      // For compatibility with code expecting audioUrls
+      audioUrls: [
+        {
+          url: url,
+          text: text,
+        },
+      ],
+    });
+  } catch (err) {
+    console.error("TTS Error:", err);
+    res.status(500).json({
+      success: false,
+      error: "TTS failed: " + err.message,
     });
   }
 });
