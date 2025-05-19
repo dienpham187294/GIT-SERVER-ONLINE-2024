@@ -15,7 +15,7 @@ async function sendmailDK(
     });
 
     const mailOptions = {
-      from: '"Cùng thực hành" <dienpham187294@gmail.com>',
+      from: '"Cùng-thực-hành" <dienpham187294@gmail.com>',
       to: toEmail,
       subject: subjectText,
       html: `
