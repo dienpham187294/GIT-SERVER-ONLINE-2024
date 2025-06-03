@@ -29,9 +29,13 @@ function RegAnalyze(transcript, CMDlist) {
   // Step 1: Match individual words
   updatedResultSetsObj.forEach((word) => {
     for (const cmd of CMDlistSetObj) {
+      const diff = levenshtein(item.text, cmd.text);
+      const per = (item.text.length - diff) / item.text.length;
+      const percent = Math.floor(Math.max(sim, per));
       if (
         !cmd.stt &&
-        stringSimilarity.compareTwoStrings(word.text, cmd.text) > 0.7
+        (stringSimilarity.compareTwoStrings(word.text, cmd.text) > 0.7 ||
+          percent > 0.7)
       ) {
         word.stt = cmd.stt = true;
         word.text = cmd.text;

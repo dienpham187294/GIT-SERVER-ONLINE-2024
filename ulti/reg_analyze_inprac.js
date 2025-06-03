@@ -88,3 +88,6 @@ function removeAccentsAndLowercase(text) {
 }
 
 module.exports = { RegAnalyzeInPrac };
+
+
+
