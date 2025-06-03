@@ -26,19 +26,19 @@ function RegAnalyze(transcript, CMDlist) {
     .split(" ")
     .map((text) => ({ stt: false, text }));
 
-  // Step 1: Match individual words
   updatedResultSetsObj.forEach((word) => {
     for (const cmd of CMDlistSetObj) {
-      const diff = levenshtein(item.text, cmd.text);
-      const per = (item.text.length - diff) / item.text.length;
-      const percent = Math.floor(Math.max(sim, per));
-      if (
-        !cmd.stt &&
-        (stringSimilarity.compareTwoStrings(word.text, cmd.text) > 0.7 ||
-          percent > 0.7)
-      ) {
+      if (cmd.stt) continue;
+
+      const sim = stringSimilarity.compareTwoStrings(word.text, cmd.text);
+      const diff = levenshtein(word.text, cmd.text);
+      const per = 1 - diff / Math.max(word.text.length, cmd.text.length);
+
+      const percent = Math.max(sim, per);
+
+      if (percent > 0.7) {
         word.stt = cmd.stt = true;
-        word.text = cmd.text;
+        word.text = cmd.text; // Gán lại văn bản khớp (nếu cần)
         break;
       }
     }
