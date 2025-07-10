@@ -224,7 +224,7 @@ async function processQueue() {
         .pipe(res)
         .on("finish", () => {
           isProcessing = false;
-          setTimeout(processQueue, 1000);
+          setTimeout(processQueue, 100);
         });
       return;
     }
@@ -248,7 +248,7 @@ async function processQueue() {
     res.status(500).send("TTS failed");
   } finally {
     isProcessing = false;
-    setTimeout(processQueue, 1000); // tránh spam
+    setTimeout(processQueue, 500); // tránh spam
   }
 }
 
