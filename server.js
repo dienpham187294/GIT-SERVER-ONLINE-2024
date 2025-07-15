@@ -9,7 +9,7 @@ import fs from "fs";
 import crypto from "crypto";
 import googleTTS from "google-tts-api";
 import { fileURLToPath } from "url";
-
+import ffmpeg from "fluent-ffmpeg";
 // Import local modules
 import routerIO from "./router/io.js";
 import message from "./router/message.js";
@@ -206,11 +206,128 @@ function getCachePath(text) {
   return path.join(CACHE_DIR, `${hash}.mp3`);
 }
 
+// async function processQueue() {
+//   if (isProcessing || ttsQueue.length === 0) return;
+//   isProcessing = true;
+//   const { text, res } = ttsQueue.shift();
+//   const cachePath = getCachePath(text);
+//   try {
+//     // Nếu cache tồn tại lúc đang xử lý
+//     if (fs.existsSync(cachePath)) {
+//       fs.createReadStream(cachePath)
+//         .on("open", () => {
+//           res.set({
+//             "Content-Type": "audio/mpeg",
+//             "Content-Disposition": 'inline; filename="speech.mp3"',
+//           });
+//         })
+//         .pipe(res)
+//         .on("finish", () => {
+//           isProcessing = false;
+//           setTimeout(processQueue, 100);
+//         });
+//       return;
+//     }
+//     // Chưa có cache, gọi Google TTS
+//     const url = googleTTS.getAudioUrl(text, {
+//       lang: "en",
+//       slow: true,
+//     });
+//     const audioRes = await fetch(url);
+//     const arrayBuffer = await audioRes.arrayBuffer();
+//     const buffer = Buffer.from(arrayBuffer);
+//     // Lưu file cache
+//     fs.writeFileSync(cachePath, buffer);
+//     res.set({
+//       "Content-Type": "audio/mpeg",
+//       "Content-Disposition": 'inline; filename="speech.mp3"',
+//     });
+//     res.send(buffer);
+//   } catch (err) {
+//     console.error("TTS error:", err);
+
+//     res.status(500).send("TTS failed");
+//   } finally {
+//     isProcessing = false;
+//     setTimeout(processQueue, 500); // tránh spam
+//   }
+// }
+
+// Hàm tách text thành các đoạn nhỏ hơn 200 ký tự
+function splitText(text, maxLength = 200) {
+  if (text.length <= maxLength) return [text];
+  const chunks = [];
+  let current = "";
+  // Tách theo câu trước
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim());
+  for (let sentence of sentences) {
+    sentence = sentence.trim();
+    if (!sentence) continue;
+    // Nếu câu hiện tại + câu mới vẫn nhỏ hơn maxLength
+    if ((current + sentence + ". ").length <= maxLength) {
+      current += sentence + ". ";
+    } else {
+      // Nếu current không rỗng, push vào chunks
+      if (current.trim()) {
+        chunks.push(current.trim());
+        current = "";
+      }
+      // Nếu câu đơn lẻ vẫn dài hơn maxLength, tách theo từ
+      if (sentence.length > maxLength) {
+        const words = sentence.split(" ");
+        let wordChunk = "";
+        for (let word of words) {
+          if ((wordChunk + word + " ").length <= maxLength) {
+            wordChunk += word + " ";
+          } else {
+            if (wordChunk.trim()) {
+              chunks.push(wordChunk.trim());
+            }
+            wordChunk = word + " ";
+          }
+        }
+        if (wordChunk.trim()) {
+          current = wordChunk;
+        }
+      } else {
+        current = sentence + ". ";
+      }
+    }
+  }
+  if (current.trim()) {
+    chunks.push(current.trim());
+  }
+  return chunks.length > 0 ? chunks : [text];
+}
+
+// Hàm tạo audio buffer từ text chunk
+async function createAudioBuffer(text) {
+  const url = googleTTS.getAudioUrl(text, {
+    lang: "en",
+    slow: true,
+  });
+  const audioRes = await fetch(url);
+  const arrayBuffer = await audioRes.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// Hàm ghép nhiều audio buffer thành một (chỉ nối buffer đơn giản)
+async function mergeAudioBuffers(audioBuffers) {
+  if (audioBuffers.length === 1) {
+    return audioBuffers[0];
+  }
+
+  // Nối các buffer lại với nhau đơn giản
+  // Lưu ý: Đây là cách nối đơn giản, có thể không hoàn hảo về mặt audio
+  return Buffer.concat(audioBuffers);
+}
+
 async function processQueue() {
   if (isProcessing || ttsQueue.length === 0) return;
   isProcessing = true;
   const { text, res } = ttsQueue.shift();
   const cachePath = getCachePath(text);
+
   try {
     // Nếu cache tồn tại lúc đang xử lý
     if (fs.existsSync(cachePath)) {
@@ -228,21 +345,37 @@ async function processQueue() {
         });
       return;
     }
-    // Chưa có cache, gọi Google TTS
-    const url = googleTTS.getAudioUrl(text, {
-      lang: "en",
-      slow: true,
-    });
-    const audioRes = await fetch(url);
-    const arrayBuffer = await audioRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    // Lưu file cache
-    fs.writeFileSync(cachePath, buffer);
+
+    let finalBuffer;
+
+    // Kiểm tra độ dài text
+    if (text.length > 200) {
+      // Tách text thành các chunk
+      const textChunks = splitText(text, 200);
+      const audioBuffers = [];
+
+      // Tạo audio buffer cho từng chunk
+      for (let i = 0; i < textChunks.length; i++) {
+        const chunkBuffer = await createAudioBuffer(textChunks[i]);
+        audioBuffers.push(chunkBuffer);
+      }
+
+      // Ghép các buffer lại
+      finalBuffer = await mergeAudioBuffers(audioBuffers);
+    } else {
+      // Text ngắn, xử lý bình thường
+      finalBuffer = await createAudioBuffer(text);
+    }
+
+    // Lưu vào cache
+    fs.writeFileSync(cachePath, finalBuffer);
+
+    // Trả về buffer
     res.set({
       "Content-Type": "audio/mpeg",
       "Content-Disposition": 'inline; filename="speech.mp3"',
     });
-    res.send(buffer);
+    res.send(finalBuffer);
   } catch (err) {
     console.error("TTS error:", err);
     res.status(500).send("TTS failed");
@@ -251,7 +384,6 @@ async function processQueue() {
     setTimeout(processQueue, 500); // tránh spam
   }
 }
-
 app.post("/tts", (req, res) => {
   const text = req.body.text?.trim();
   if (!text) return res.status(400).send("Missing text");
